@@ -1,17 +1,16 @@
-import express, { Request, Response } from 'express';
+/**
+ * @module index
+ * @description Server entry point.
+ *
+ * Bootstraps the Express application and binds it to a port.
+ * Import `createApp` from `./app` in tests — never import this file directly
+ * in test suites, as it starts the HTTP server immediately.
+ */
 
-const app = express();
+import { createApp } from './app';
+
 const PORT = process.env.PORT || 3001;
-
-app.use(express.json());
-
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'talenttrust-backend' });
-});
-
-app.get('/api/v1/contracts', (_req: Request, res: Response) => {
-  res.json({ contracts: [] });
-});
+const app = createApp();
 
 app.listen(PORT, () => {
   console.log(`TalentTrust API listening on http://localhost:${PORT}`);
