@@ -58,3 +58,30 @@ Keep the build passing before merging.
 ## License
 
 MIT
+
+## -------------- Utilities  ------------
+## Retry & Backoff Utilities
+
+Reusable retry policies for handling transient failures, located in `src/utils/retry.ts`.
+
+### Usage
+```typescript
+import { withRetry } from './utils/retry';
+
+const data = await withRetry(() => fetchFromApi(), {
+  maxAttempts: 5,
+  baseDelayMs: 200,
+  maxDelayMs: 5000,
+  jitter: true,
+});
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `maxAttempts` | number | 3 | Maximum retry attempts |
+| `baseDelayMs` | number | 200 | Base delay in ms |
+| `maxDelayMs` | number | 5000 | Max delay cap in ms |
+| `jitter` | boolean | true | Adds randomness to delay |
+| `isRetryable` | function | `() => true` | Controls which errors retry |
