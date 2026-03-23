@@ -46,15 +46,20 @@ the recommended GitHub branch protection settings.
 
 ```
 src/
-├── index.ts          # Server entry point
-├── app.ts            # Express app factory
+├── index.ts            # Server entry point
+├── app.ts              # Express app factory
+├── middleware/
+│   └── validate.ts     # Schema validation middleware factory
+├── schemas/
+│   └── contracts.ts    # Validation schemas for /api/v1/contracts
 └── routes/
-    ├── health.ts     # GET /health
-    └── contracts.ts  # GET /api/v1/contracts
+    ├── health.ts       # GET /health
+    └── contracts.ts    # GET + POST /api/v1/contracts
 ```
 
 See [docs/backend/architecture.md](docs/backend/architecture.md) for design
-decisions and planned integrations.
+decisions and [docs/backend/validation.md](docs/backend/validation.md) for
+the validation middleware guide.
 
 ## Contributing
 
