@@ -125,11 +125,19 @@ describe("Contracts API", () => {
     const cRes = await request(app)
       .post("/api/v1/users")
       .send({ username: "c1", email: "c1@ex.com", role: "client" });
+    if (!cRes.body.user)
+      throw new Error(
+        "cRes failed: " + cRes.status + " " + JSON.stringify(cRes.body),
+      );
     clientId = cRes.body.user.id;
 
     const fRes = await request(app)
       .post("/api/v1/users")
       .send({ username: "f1", email: "f1@ex.com", role: "freelancer" });
+    if (!fRes.body.user)
+      throw new Error(
+        "fRes failed: " + fRes.status + " " + JSON.stringify(fRes.body),
+      );
     freelancerId = fRes.body.user.id;
   });
 
@@ -221,11 +229,17 @@ describe("Global Error Handler", () => {
       throw new Error("Database exploded");
     });
 
+    // Suppress the expected stack trace from polluting the test output
+    const mockConsoleErr = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
     const res = await request(app).get("/api/v1/users");
 
     expect(res.status).toBe(500);
     expect(res.body.error).toBe("Internal server error");
 
+    mockConsoleErr.mockRestore();
     mockDbQuery.mockRestore();
   });
 });
