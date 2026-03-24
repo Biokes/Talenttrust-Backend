@@ -1,1 +1,38 @@
-import { switchToGreen, rollback, getStatus } from './deploy';\nimport * as fs from 'fs';\nimport * as path from 'path';\n\nconst STATE_FILE = path.join(process.cwd(), '.deployment-state.json');\n\ndescribe('Deployment Manager', () => {\n  beforeEach(async () => {\n    if (fs.existsSync(STATE_FILE)) fs.unlinkSync(STATE_FILE);\n  });\n\n  it('initial state is blue', async () => {\n    const status = await getStatus();\n    expect(status.activeColor).toBe('blue');\n  });\n\n  it('switch to green updates state', async () => {\n    await switchToGreen();\n    const status = await getStatus();\n    expect(status.activeColor).toBe('green');\n    expect(status.previousColor).toBe('blue');\n  });\n\n  it('rollback restores previous', async () => {\n    await switchToGreen();\n    await rollback();\n    const status = await getStatus();\n    expect(status.activeColor).toBe('blue');\n  });\n\n  it('switch to green already green no-op', async () => {\n    await switchToGreen();\n    const before = await getStatus();\n    await switchToGreen();\n    const after = await getStatus();\n    expect(after.lastSwitch).toBe(before.lastSwitch);\n  });\n});
+import { switchToGreen, rollback, getStatus } from "./deploy";
+import * as fs from "fs";
+import * as path from "path";
+
+const STATE_FILE = path.join(process.cwd(), ".deployment-state.json");
+
+describe("Deployment Manager", () => {
+  beforeEach(async () => {
+    if (fs.existsSync(STATE_FILE)) fs.unlinkSync(STATE_FILE);
+  });
+
+  it("initial state is blue", async () => {
+    const status = await getStatus();
+    expect(status.activeColor).toBe("blue");
+  });
+
+  it("switch to green updates state", async () => {
+    await switchToGreen();
+    const status = await getStatus();
+    expect(status.activeColor).toBe("green");
+    expect(status.previousColor).toBe("blue");
+  });
+
+  it("rollback restores previous", async () => {
+    await switchToGreen();
+    await rollback();
+    const status = await getStatus();
+    expect(status.activeColor).toBe("blue");
+  });
+
+  it("switch to green already green no-op", async () => {
+    await switchToGreen();
+    const before = await getStatus();
+    await switchToGreen();
+    const after = await getStatus();
+    expect(after.lastSwitch).toBe(before.lastSwitch);
+  });
+});

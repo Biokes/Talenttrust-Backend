@@ -1,1 +1,27 @@
-import express, { Express, Request, Response } from 'express';\n\n/**\n * Core Express app for TalentTrust Backend.\n * Mounts routes and middleware.\n */\nexport class TalentTrustApp {\n  private app: Express;\n\n  constructor() {\n    this.app = express();\n    this.app.use(express.json());\n    this.mountRoutes();\n  }\n\n  private mountRoutes(): void {\n    // API routes\n    this.app.get('/api/v1/contracts', (_req: Request, res: Response) => {\n      res.json({ contracts: [] });\n    });\n  }\n\n  getApp(): Express {\n    return this.app;\n  }\n}
+import express, { Express, Request, Response } from 'express';
+
+ /**
+  * Core Express app for TalentTrust Backend.
+  * Mounts routes and middleware.
+  */
+ export class TalentTrustApp {
+   private app: Express;
+
+   constructor() {
+     this.app = express();
+     this.app.use(express.json());
+     this.mountRoutes();
+   }
+
+   private mountRoutes(): void {
+     // API routes
+     this.app.get('/api/v1/contracts', (_req: Request, res: Response) => {
+       res.json({ contracts: [] });
+     });
+   }
+
+   getApp(): Express {
+     return this.app;
+   }
+ }
+

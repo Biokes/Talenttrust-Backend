@@ -1,1 +1,27 @@
-import request from 'supertest';\nimport { routerApp } from './router';\n\n// Mock env for tests\ndescribe('Router', () => {\n  beforeEach(() => {\n    process.env.ACTIVE_COLOR = 'blue';\n    process.env.BLUE_PORT = '3001';\n    process.env.GREEN_PORT = '3002';\n  });\n\n  it('routes /api to blue backend', async () => {\n    const res = await request(routerApp).get('/api/v1/contracts');\n    expect(res.status).not.toBe(502);\n  });\n\n  it('health/router returns active', async () => {\n    const res = await request(routerApp).get('/health/router');\n    expect(res.body.active).toBe('http://localhost:3001');\n  });\n\n  it('switch to green updates route', async () => {\n    process.env.ACTIVE_COLOR = 'green';\n    const res = await request(routerApp).get('/health/router');\n    expect(res.body.active).toBe('http://localhost:3002');\n  });\n});
+import request from "supertest";
+import { routerApp } from "./router";
+
+// Mock env for tests
+describe("Router", () => {
+  beforeEach(() => {
+    process.env.ACTIVE_COLOR = "blue";
+    process.env.BLUE_PORT = "3001";
+    process.env.GREEN_PORT = "3002";
+  });
+
+  it("routes /api to blue backend", async () => {
+    const res = await request(routerApp).get("/api/v1/contracts");
+    expect(res.status).not.toBe(502);
+  });
+
+  it("health/router returns active", async () => {
+    const res = await request(routerApp).get("/health/router");
+    expect(res.body.active).toBe("http://localhost:3001");
+  });
+
+  it("switch to green updates route", async () => {
+    process.env.ACTIVE_COLOR = "green";
+    const res = await request(routerApp).get("/health/router");
+    expect(res.body.active).toBe("http://localhost:3002");
+  });
+});
