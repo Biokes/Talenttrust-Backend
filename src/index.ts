@@ -13,6 +13,10 @@ app.get('/api/v1/contracts', (_req: Request, res: Response) => {
   res.json({ contracts: [] });
 });
 
-app.listen(PORT, () => {
-  console.log(`TalentTrust API listening on http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`TalentTrust API listening on http://localhost:${PORT}`);
+  });
+}
+
+export default app;
