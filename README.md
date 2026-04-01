@@ -3,6 +3,14 @@
 Express API for the TalentTrust decentralized freelancer escrow protocol.
 Handles contract metadata, reputation, and integration with Stellar/Soroban.
 
+## Features
+
+- **Queue-Based Background Jobs**: Durable job processing with BullMQ and Redis
+- **Contract Processing**: Asynchronous blockchain contract operations
+- **Email Notifications**: Non-blocking email delivery
+- **Reputation System**: Background reputation score calculations
+- **Blockchain Sync**: Efficient blockchain data synchronization
+
 ## Prerequisites
 
 - Node.js 18+
