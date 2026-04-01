@@ -1,41 +1,46 @@
-import express, { Request, Response } from 'express';
+/**
+ * @module app
+ * @description Express application factory.
+ *
+ * Separates app configuration from server bootstrap so the app can be
+ * imported in tests without binding to a port.
+ *
+ * @security
+ *  - express.json() body parser is scoped to this app instance only.
+ *  - All routes return JSON; no HTML rendering surface.
+ *  - Helmet-style headers should be added here when the dependency is
+ *    introduced (tracked in docs/backend/security.md).
+ */
 
-import { DependencyScanProvider, DependencyScanService } from './security/dependency-scan-service';
+import express, { Request, Response, NextFunction } from 'express';
+import { healthRouter } from './routes/health';
+import { contractsRouter } from './routes/contracts';
 
-export function createApp(scanProvider: DependencyScanProvider = new DependencyScanService()) {
+/**
+ * Creates and configures the Express application.
+ *
+ * @returns Configured Express app instance (not yet listening).
+ */
+export function createApp(): express.Application {
   const app = express();
 
+  // ── Middleware ────────────────────────────────────────────────────────────
   app.use(express.json());
 
-  app.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok', service: 'talenttrust-backend' });
+  // ── Routes ────────────────────────────────────────────────────────────────
+  app.use('/health', healthRouter);
+  app.use('/api/v1/contracts', contractsRouter);
+
+  // ── 404 handler ──────────────────────────────────────────────────────────
+  app.use((_req: Request, res: Response) => {
+    res.status(404).json({ error: 'Not Found' });
   });
 
-  app.get('/api/v1/contracts', (_req: Request, res: Response) => {
-    res.json({ contracts: [] });
-  });
-
-  /**
-   * @notice Returns the latest dependency vulnerability snapshot and policy decision.
-   * @dev Use `?refresh=true` to bypass in-memory cache and force a new `npm audit` execution.
-   */
-  app.get('/api/v1/security/dependencies', async (req: Request, res: Response) => {
-    try {
-      const refresh = req.query.refresh === 'true';
-      const result = await scanProvider.getLatestScan(refresh);
-
-      if (result.status === 'error') {
-        res.status(503).json(result);
-        return;
-      }
-
-      res.status(200).json(result);
-    } catch (error) {
-      res.status(503).json({
-        status: 'error',
-        message: `Dependency scan failed unexpectedly: ${(error as Error).message}`,
-      });
-    }
+  // ── Global error handler ─────────────────────────────────────────────────
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Internal Server Error' });
   });
 
   return app;
