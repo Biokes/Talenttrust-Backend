@@ -150,8 +150,7 @@ describe('createRateLimiter – middleware', () => {
       // 1st violation (request 2 over limit of 1)
       await fireRequests(app, 2, '/api/test', ip);
       // 2nd violation = abuse threshold reached
-      const results = await fireRequests(app, 1, '/api/test', ip);
-      const blocked = results[0];
+      await fireRequests(app, 1, '/api/test', ip);
 
       // May already be blocked or just rate-limited; subsequent should block
       const followUp = await request(app).get('/api/test').set('X-Forwarded-For', ip);

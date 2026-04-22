@@ -6,11 +6,8 @@ jest.mock('./soroban.service');
 
 describe('ContractsService', () => {
   let contractsService: ContractsService;
-  let mockSorobanService: jest.Mocked<SorobanService>;
 
   beforeEach(() => {
-    mockSorobanService = new SorobanService() as jest.Mocked<SorobanService>;
-
     // In our implementation, ContractsService instantiates its own SorobanService.
     // By mocking the module, instances will be mocked automatically.
     contractsService = new ContractsService();

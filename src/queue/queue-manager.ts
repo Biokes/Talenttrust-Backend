@@ -58,6 +58,10 @@ export class QueueManager {
       defaultJobOptions: queueConfig.defaultJobOptions,
     });
 
+    queue.on('error', (error: Error) => {
+      console.error(`[${jobType}] Queue error:`, error.message);
+    });
+
     const worker = new Worker(
       jobType,
       async (job: Job) => {

@@ -234,7 +234,7 @@ describe('Integration: Data Retention Lifecycle', () => {
         'admin',
       );
 
-      const profile2 = await manager.storeData(
+      await manager.storeData(
         {
           entityType: DataEntityType.USER_PROFILE,
           data: { userId: 'user2', email: 'user2@example.com' },

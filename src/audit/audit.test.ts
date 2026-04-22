@@ -9,7 +9,6 @@
  * - Security: tamper detection, mutation prevention, input validation
  */
 
-import { createHash } from 'crypto';
 import request from 'supertest';
 import express from 'express';
 import { AuditStore, GENESIS_HASH, computeEntryHash } from './store';
@@ -40,7 +39,6 @@ function buildTestApp(store?: AuditStore) {
     // Swap the singleton for an isolated store in integration tests
     const svc = new AuditService(store);
     const router = express.Router();
-    const { auditRouter: _ignored, ...rest } = require('./router');
     // Use a fresh router wired to the isolated service
     router.get('/', (req, res) => {
       const limit = Math.min(parseInt(req.query['limit'] as string ?? '100', 10) || 100, 1000);
@@ -264,7 +262,7 @@ describe('AuditStore', () => {
       const all = store.getAll();
       store._reset();
       // Re-insert first entry normally
-      const first = store.append(makeInput());
+      store.append(makeInput());
       // Manually push a tampered second entry (bypass append)
       const tampered: AuditEntry = Object.freeze({
         ...all[1],

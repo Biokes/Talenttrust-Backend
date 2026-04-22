@@ -74,7 +74,7 @@ export class ContractMetadataController {
       );
 
       res.json(result);
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -101,7 +101,7 @@ export class ContractMetadataController {
       }
 
       res.json(result);
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -143,7 +143,7 @@ export class ContractMetadataController {
       }
 
       res.json(result);
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Internal server error' });
     }
   }
@@ -165,7 +165,7 @@ export class ContractMetadataController {
       await contractMetadataService.delete(id);
 
       res.status(204).send();
-    } catch (error) {
+    } catch {
       res.status(500).json({ error: 'Internal server error' });
     }
   }

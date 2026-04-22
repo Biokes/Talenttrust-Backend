@@ -15,7 +15,7 @@ describe('Security Middleware Unit Tests', () => {
         });
 
         // Error handler to catch CORS errors and return 403 instead of 500
-        app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
+        app.use((err: any, _req: Request, res: Response, _next: express.NextFunction) => {
             if (err.message === 'Not allowed by CORS policy') {
                 res.status(403).json({ error: 'CORS policy violation' });
             } else {

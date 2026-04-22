@@ -11,7 +11,6 @@ import {
   isProduction,
   isStaging,
   isDevelopment,
-  Environment,
 } from './environment';
 
 describe('Environment Configuration', () => {

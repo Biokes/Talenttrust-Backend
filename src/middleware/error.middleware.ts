@@ -10,7 +10,7 @@ import { Request, Response, NextFunction } from 'express';
  * @param res The Express Response.
  * @param next The Express NextFunction.
  */
-export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
+export const errorHandler = (err: any, req: Request, res: Response, _next: NextFunction) => {
   const statusCode = err.status || 500;
   const message = err.message || 'Internal Server Error';
 
