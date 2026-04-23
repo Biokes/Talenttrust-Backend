@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../../middleware/auth';
 import { contractMetadataService } from './contractMetadata.service';
 import { CreateContractMetadataRequest, UpdateContractMetadataRequest } from './contractMetadata.types';
+import { parsePaginationQuery } from '../../utils/pagination';
 
 /**
  * Controller layer for contract metadata operations
@@ -60,15 +61,21 @@ export class ContractMetadataController {
       }
 
       const { contractId } = req.params;
-      const { page, limit, key, data_type } = req.query as any;
+      const { key, data_type } = req.query as any;
+
+      const pagination = parsePaginationQuery(req.query as Record<string, unknown>);
+      if (!pagination.ok) {
+        res.status(400).json({ error: pagination.error });
+        return;
+      }
 
       const result = await contractMetadataService.list(
         contractId,
         {
-          page: page ? parseInt(page) : undefined,
-          limit: limit ? parseInt(limit) : undefined,
+          page: pagination.value.page,
+          limit: pagination.value.limit,
           key,
-          data_type
+          data_type,
         },
         req.user
       );
