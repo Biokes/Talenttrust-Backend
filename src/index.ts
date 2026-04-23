@@ -33,8 +33,8 @@ app.post('/api/v1/jobs', async (req: Request, res: Response) => {
     const jobId = await queueManager.addJob(type as JobType, payload as JobPayload, options);
     return res.status(201).json({ jobId, type, status: 'queued' });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return res.status(500).json({ error: `Failed to enqueue job: ${message}` });
+    console.error('Failed to enqueue job', error);
+    return res.status(500).json({ error: 'An unexpected error occurred' });
   }
 });
 
@@ -54,8 +54,8 @@ app.get('/api/v1/jobs/:type/:jobId', async (req: Request, res: Response) => {
 
     return res.json(status);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return res.status(500).json({ error: `Failed to get job status: ${message}` });
+    console.error('Failed to get job status', error);
+    return res.status(500).json({ error: 'An unexpected error occurred' });
   }
 });
 

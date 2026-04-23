@@ -12,11 +12,12 @@
  *    introduced (tracked in docs/backend/security.md).
  */
 
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import { healthRouter } from './routes/health';
 import contractsModuleRouter from './routes/contracts.routes';
 import reputationRouter from './routes/reputation.routes';
 import { requestIdMiddleware } from './middleware/requestId';
+import { notFoundHandler, errorHandler } from './middleware/errorHandlers';
 
 /**
  * Creates and configures the Express application.
@@ -36,16 +37,10 @@ export function createApp(): express.Application {
   app.use('/api/v1/reputation', reputationRouter);
 
   // ── 404 handler ──────────────────────────────────────────────────────────
-  app.use((_req: Request, res: Response) => {
-    res.status(404).json({ error: 'Not Found' });
-  });
+  app.use(notFoundHandler);
 
   // ── Global error handler ─────────────────────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Internal Server Error' });
-  });
+  app.use(errorHandler);
 
   return app;
 }

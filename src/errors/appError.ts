@@ -1,3 +1,5 @@
+import { sanitizeErrorMessage, safeMessageForCode } from './safeErrors';
+
 export interface ErrorPayload {
   error: {
     code: string;
@@ -41,12 +43,16 @@ export function mapErrorToPayload(
   requestId: string,
 ): { statusCode: number; payload: ErrorPayload } {
   if (error instanceof AppError) {
+    const message = error.expose
+      ? sanitizeErrorMessage(error.message, error.code)
+      : safeMessageForCode(error.code);
+
     return {
       statusCode: error.statusCode,
       payload: {
         error: {
           code: error.code,
-          message: error.message,
+          message,
           requestId,
         },
       },
@@ -58,7 +64,7 @@ export function mapErrorToPayload(
     payload: {
       error: {
         code: 'internal_error',
-        message: 'An unexpected error occurred',
+        message: safeMessageForCode('internal_error'),
         requestId,
       },
     },
