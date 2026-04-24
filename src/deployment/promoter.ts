@@ -73,6 +73,7 @@ export function validatePromotionPath(from: Environment, to: Environment): Valid
     development: ['staging'],
     staging: ['production'],
     production: [], // Cannot promote from production
+    test: [],
   };
   
   if (!validPaths[from].includes(to)) {

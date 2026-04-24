@@ -7,12 +7,17 @@
  */
 
 import type { Request, Response } from 'express';
+import { validateEnvironment } from './config/environment';
 import { createApp } from './app';
 import { JobType, JobPayload, QueueManager } from './queue';
+
+// Validate environment at startup
+validateEnvironment();
 
 const queueManager = QueueManager.getInstance();
 
 const app = createApp();
+
 
 app.post('/api/v1/jobs', async (req: Request, res: Response) => {
   try {
