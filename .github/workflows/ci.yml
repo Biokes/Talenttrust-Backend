@@ -133,3 +133,22 @@ jobs:
 
       - name: npm audit (HIGH + CRITICAL)
         run: npm run audit:ci
+
+  # ── 5. OpenAPI Validation ──────────────────────────────────────────────────
+  openapi:
+    name: OpenAPI Spec Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate and Validate Spec
+        run: npm run test:docs
