@@ -10,6 +10,7 @@ import { validateContractBounds, ContractBoundsError } from '../contracts/bounds
  * and orchestration with the Soroban smart contract service.
  */
 export class ContractsService {
+  private repository: ContractsRepository;
   private sorobanService: SorobanService;
 
   // Mock database
@@ -62,7 +63,7 @@ export class ContractsService {
     // Simulate notifying the Soroban service to prepare the transaction
     await this.sorobanService.prepareEscrow(newContract.id, data.budget);
 
-    return newContract;
+    return stats;
   }
 
   /**
