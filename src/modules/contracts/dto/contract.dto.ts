@@ -1,12 +1,19 @@
 import { z } from 'zod';
-import { registry } from '../../../docs/openapi-registry';
+import { MAX_MILESTONES_PER_CONTRACT, milestoneSchema } from '../../../contracts/bounds';
 
 export const createContractSchema = z.object({
   body: z.object({
-    title: z.string().min(5).max(100).openapi({ example: 'DeFi Bridge Integration' }),
-    description: z.string().min(10).openapi({ example: 'Integrate the Stellar bridge with our DeFi protocol' }),
-    freelancerId: z.string().uuid().optional().openapi({ example: '123e4567-e89b-12d3-a456-426614174000' }),
-    budget: z.number().positive().openapi({ example: 500 }),
+    title: z.string().min(5).max(100),
+    description: z.string().min(10),
+    freelancerId: z.string().uuid().optional(),
+    budget: z.number().positive(),
+    milestones: z
+      .array(milestoneSchema)
+      .max(
+        MAX_MILESTONES_PER_CONTRACT,
+        `Cannot exceed ${MAX_MILESTONES_PER_CONTRACT} milestones per contract`,
+      )
+      .optional(),
   }),
 });
 

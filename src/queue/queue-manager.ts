@@ -7,7 +7,15 @@
 
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { queueConfig } from './config';
-import { JobType, JobPayload, JobResult } from './types';
+import {
+  JobType,
+  JobPayload,
+  JobResult,
+  JobEnqueueOptions,
+  FailedJobEntry,
+  FailedJobQuery,
+  ReplayJobResult,
+} from './types';
 import { jobProcessors } from './processors';
 
 /**
@@ -50,6 +58,10 @@ export class QueueManager {
       defaultJobOptions: queueConfig.defaultJobOptions,
     });
 
+    queue.on('error', (error: Error) => {
+      console.error(`[${jobType}] Queue error:`, error.message);
+    });
+
     const worker = new Worker(
       jobType,
       async (job: Job) => {
@@ -84,7 +96,7 @@ export class QueueManager {
   public async addJob(
     jobType: JobType,
     payload: JobPayload,
-    options?: { priority?: number; delay?: number }
+    options?: JobEnqueueOptions
   ): Promise<string> {
     const queue = this.queues.get(jobType);
     if (!queue) {
@@ -93,6 +105,92 @@ export class QueueManager {
 
     const job = await queue.add(jobType, payload, options);
     return job.id!;
+  }
+
+  private buildReplayJobId(jobType: JobType, originalJobId: string): string {
+    return `replay:${jobType}:${originalJobId}`;
+  }
+
+  private toFailedJobEntry(jobType: JobType, job: Job): FailedJobEntry {
+    return {
+      jobId: String(job.id),
+      jobType,
+      name: job.name,
+      data: job.data as JobPayload,
+      failedReason: job.failedReason ?? null,
+      attemptsMade: job.attemptsMade,
+      finishedOn: job.finishedOn ?? null,
+      timestamp: job.timestamp,
+      replayDeduplicationKey: this.buildReplayJobId(jobType, String(job.id)),
+    };
+  }
+
+  public async getFailedJobs(query: FailedJobQuery = {}): Promise<FailedJobEntry[]> {
+    const normalizedLimit = Math.min(Math.max(query.limit ?? 50, 1), 100);
+    const normalizedOffset = Math.max(query.offset ?? 0, 0);
+    const fetchEnd = normalizedOffset + normalizedLimit - 1;
+
+    if (query.jobType) {
+      const queue = this.queues.get(query.jobType);
+      if (!queue) {
+        throw new Error(`Queue for ${query.jobType} not initialized`);
+      }
+
+      const failed = await queue.getJobs(['failed'], normalizedOffset, fetchEnd, false);
+      return failed.map((job) => this.toFailedJobEntry(query.jobType as JobType, job));
+    }
+
+    const allFailedJobs = await Promise.all(
+      Array.from(this.queues.entries()).map(async ([jobType, queue]) => {
+        const failed = await queue.getJobs(['failed'], 0, fetchEnd, false);
+        return failed.map((job) => this.toFailedJobEntry(jobType, job));
+      })
+    );
+
+    return allFailedJobs
+      .flat()
+      .sort((a, b) => (b.finishedOn ?? 0) - (a.finishedOn ?? 0))
+      .slice(normalizedOffset, normalizedOffset + normalizedLimit);
+  }
+
+  public async reprocessFailedJob(
+    jobType: JobType,
+    originalJobId: string
+  ): Promise<ReplayJobResult> {
+    const queue = this.queues.get(jobType);
+    if (!queue) {
+      throw new Error(`Queue for ${jobType} not initialized`);
+    }
+
+    const failedJob = await queue.getJob(originalJobId);
+    if (!failedJob) {
+      throw new Error(`Failed job not found: ${originalJobId}`);
+    }
+
+    const currentState = await failedJob.getState();
+    if (currentState !== 'failed') {
+      throw new Error(`Job ${originalJobId} is not in failed state`);
+    }
+
+    const replayJobId = this.buildReplayJobId(jobType, originalJobId);
+    const existingReplayJob = await queue.getJob(replayJobId);
+    if (existingReplayJob) {
+      return {
+        replayJobId,
+        deduplicated: true,
+        originalJobId,
+        jobType,
+      };
+    }
+
+    await queue.add(jobType, failedJob.data as JobPayload, { jobId: replayJobId });
+
+    return {
+      replayJobId,
+      deduplicated: false,
+      originalJobId,
+      jobType,
+    };
   }
 
   /**
@@ -132,12 +230,20 @@ export class QueueManager {
       console.error(`[${jobType}] Job ${job?.id} failed:`, error.message);
     });
 
+    worker.on('error', (error: Error) => {
+      console.error(`[${jobType}] Worker error:`, error.message);
+    });
+
     queueEvents.on('waiting', ({ jobId }: { jobId: string | undefined }) => {
       console.log(`[${jobType}] Job ${jobId} is waiting`);
     });
 
     queueEvents.on('active', ({ jobId }: { jobId: string | undefined }) => {
       console.log(`[${jobType}] Job ${jobId} is active`);
+    });
+
+    queueEvents.on('error', (error: Error) => {
+      console.error(`[${jobType}] QueueEvents error:`, error.message);
     });
   }
 

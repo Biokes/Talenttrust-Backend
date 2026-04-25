@@ -185,6 +185,98 @@ Soft deletes a metadata record. The record is marked as deleted but retained in 
 **Error Responses:**
 - `401` - Authentication required
 
+## Jobs DLQ API
+
+### Overview
+
+Dead-letter queue (DLQ) endpoints allow administrators to inspect failed jobs and trigger controlled replays.
+These endpoints are protected and audited.
+
+### Authorization
+
+- Requires `Authorization: Bearer <token>`
+- Only `demo-admin-token` (or admin users in production auth) can access these routes
+- Non-admin users receive `403 Admin role required`
+
+### List DLQ Entries
+
+**GET** `/jobs/dlq`
+
+Optional query parameters:
+- `type` - job type (`email-notification`, `contract-processing`, `reputation-update`, `blockchain-sync`)
+- `limit` - number of items (default: 50, max: 100)
+- `offset` - pagination offset (default: 0)
+
+**Response (200):**
+```json
+{
+  "entries": [
+    {
+      "jobId": "123",
+      "jobType": "email-notification",
+      "name": "email-notification",
+      "data": {
+        "to": "user@example.com",
+        "subject": "Welcome",
+        "body": "..."
+      },
+      "failedReason": "Invalid email address",
+      "attemptsMade": 1,
+      "finishedOn": 1713786060000,
+      "timestamp": 1713786059000,
+      "replayDeduplicationKey": "replay:email-notification:123"
+    }
+  ],
+  "limit": 50,
+  "offset": 0,
+  "count": 1
+}
+```
+
+### Reprocess a Failed Job
+
+**POST** `/jobs/dlq/reprocess`
+
+**Request Body:**
+```json
+{
+  "type": "email-notification",
+  "jobId": "123",
+  "reason": "Retry after dependency incident resolved"
+}
+```
+
+Rules:
+- `reason` is required and must be at least 5 characters
+- Replay is idempotent via deterministic dedupe key: `replay:<type>:<originalJobId>`
+
+**Response (202):** replay enqueued
+```json
+{
+  "replayJobId": "replay:email-notification:123",
+  "deduplicated": false,
+  "originalJobId": "123",
+  "jobType": "email-notification"
+}
+```
+
+**Response (200):** replay already exists (deduped)
+```json
+{
+  "replayJobId": "replay:email-notification:123",
+  "deduplicated": true,
+  "originalJobId": "123",
+  "jobType": "email-notification"
+}
+```
+
+**Error Responses:**
+- `400` - invalid type or missing fields
+- `401` - authentication required
+- `403` - admin role required
+- `404` - failed job not found
+- `409` - job is not in failed state
+
 ## Sensitive Data Protection
 
 Metadata marked as `is_sensitive: true` is automatically masked for unauthorized users:

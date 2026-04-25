@@ -1,14 +1,15 @@
 import { CreateContractDto } from '../modules/contracts/dto/contract.dto';
 import { SorobanService } from './soroban.service';
+import { validateContractBounds, ContractBoundsError } from '../contracts/bounds';
 
 /**
  * @dev Service layer for managing Freelancer Escrow Contracts.
- * Handles business logic, database interactions (mocked for now), 
+ * Handles business logic, database interactions (mocked for now),
  * and orchestration with the Soroban smart contract service.
  */
 export class ContractsService {
   private sorobanService: SorobanService;
-  
+
   // Mock database
   private contracts: any[] = [];
 
@@ -27,19 +28,26 @@ export class ContractsService {
 
   /**
    * Creates a new contract off-chain, preparing it for escrow deposit.
+   * Enforces milestone count and total amount caps before persisting.
    * @param data The contract details conforming to CreateContractDto.
    * @returns The newly created contract object.
+   * @throws ContractBoundsError if budget or milestone totals exceed policy limits.
    */
   public async createContract(data: CreateContractDto) {
+    const boundsCheck = validateContractBounds(data.budget, data.milestones);
+    if (!boundsCheck.valid) {
+      throw new ContractBoundsError(boundsCheck.error);
+    }
+
     const newContract = {
       id: crypto.randomUUID(),
       ...data,
       status: 'PENDING',
       createdAt: new Date(),
     };
-    
+
     this.contracts.push(newContract);
-    
+
     // Simulate notifying the Soroban service to prepare the transaction
     await this.sorobanService.prepareEscrow(newContract.id, data.budget);
 

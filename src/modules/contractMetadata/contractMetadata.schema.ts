@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { registry } from '../../docs/openapi-registry';
+import { paginationQuerySchema as basePaginationQuerySchema } from '../../utils/pagination';
 
 export const createContractMetadataSchema = z.object({
   key: z.string()
@@ -45,23 +45,7 @@ export const metadataIdParamsSchema = z.object({
   id: z.string().uuid('Invalid metadata ID format').openapi({ example: '123e4567-e89b-12d3-a456-426614174001' })
 });
 
-export const paginationQuerySchema = z.object({
-  page: z.preprocess(
-    (v) => (v === undefined || v === '' || v === null ? '1' : v),
-    z
-      .string()
-      .regex(/^\d+$/, 'Page must be a positive integer')
-      .transform((s: string) => Number(s))
-      .refine((n: number) => n > 0, 'Page must be greater than 0'),
-  ).openapi({ type: 'integer', default: 1 }),
-  limit: z.preprocess(
-    (v) => (v === undefined || v === '' || v === null ? '20' : v),
-    z
-      .string()
-      .regex(/^\d+$/, 'Limit must be a positive integer')
-      .transform((s: string) => Number(s))
-      .refine((n: number) => n > 0 && n <= 100, 'Limit must be between 1 and 100'),
-  ).openapi({ type: 'integer', default: 20 }),
-  key: z.string().optional().openapi({ example: 'payment_status' }),
-  data_type: z.enum(['string', 'number', 'boolean', 'json']).optional().openapi({ example: 'string' })
+export const paginationQuerySchema = basePaginationQuerySchema.extend({
+  key: z.string().optional(),
+  data_type: z.enum(['string', 'number', 'boolean', 'json']).optional(),
 });
