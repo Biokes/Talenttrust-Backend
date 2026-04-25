@@ -31,7 +31,7 @@ export class WebhookService {
       if (payload.retryCount < MAX_RETRIES) {
         const delay = INITIAL_DELAY * Math.pow(2, payload.retryCount);
         payload.retryCount++;
-        
+
         console.warn(`Webhook ${payload.id} failed. Retrying in ${delay}ms...`);
         setTimeout(() => this.send(payload), delay);
       } else {

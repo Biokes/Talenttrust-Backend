@@ -11,6 +11,18 @@ import { JobType } from './types';
 describe('QueueManager', () => {
   let queueManager: QueueManager;
 
+  async function waitForJobToFail(jobId: string): Promise<void> {
+    const maxAttempts = 30;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const status = await queueManager.getJobStatus(JobType.EMAIL_NOTIFICATION, jobId);
+      if (status?.state === 'failed') {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error(`Job ${jobId} did not fail within timeout`);
+  }
+
   beforeEach(() => {
     queueManager = QueueManager.getInstance();
   });
@@ -155,6 +167,68 @@ describe('QueueManager', () => {
       await queueManager.initializeQueue(JobType.EMAIL_NOTIFICATION);
       await queueManager.shutdown();
       await expect(queueManager.shutdown()).resolves.not.toThrow();
+    });
+  });
+
+  describe('DLQ Operations', () => {
+    beforeEach(async () => {
+      await queueManager.initializeQueue(JobType.EMAIL_NOTIFICATION);
+    });
+
+    it('should list failed jobs', async () => {
+      const failedJobId = await queueManager.addJob(
+        JobType.EMAIL_NOTIFICATION,
+        {
+          to: 'not-an-email',
+          subject: 'DLQ test',
+          body: 'should fail',
+        },
+        { attempts: 1 }
+      );
+
+      await waitForJobToFail(failedJobId);
+
+      const failedJobs = await queueManager.getFailedJobs({
+        jobType: JobType.EMAIL_NOTIFICATION,
+        limit: 20,
+      });
+
+      const target = failedJobs.find((entry) => entry.jobId === failedJobId);
+      expect(target).toBeDefined();
+      expect(target?.jobType).toBe(JobType.EMAIL_NOTIFICATION);
+      expect(target?.replayDeduplicationKey).toBe(
+        `replay:${JobType.EMAIL_NOTIFICATION}:${failedJobId}`
+      );
+    });
+
+    it('should reprocess failed jobs with dedupe', async () => {
+      const failedJobId = await queueManager.addJob(
+        JobType.EMAIL_NOTIFICATION,
+        {
+          to: 'still-invalid',
+          subject: 'Replay test',
+          body: 'should fail',
+        },
+        { attempts: 1 }
+      );
+
+      await waitForJobToFail(failedJobId);
+
+      const firstReplay = await queueManager.reprocessFailedJob(
+        JobType.EMAIL_NOTIFICATION,
+        failedJobId
+      );
+      expect(firstReplay.deduplicated).toBe(false);
+      expect(firstReplay.replayJobId).toBe(
+        `replay:${JobType.EMAIL_NOTIFICATION}:${failedJobId}`
+      );
+
+      const secondReplay = await queueManager.reprocessFailedJob(
+        JobType.EMAIL_NOTIFICATION,
+        failedJobId
+      );
+      expect(secondReplay.deduplicated).toBe(true);
+      expect(secondReplay.replayJobId).toBe(firstReplay.replayJobId);
     });
   });
 });

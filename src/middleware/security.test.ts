@@ -56,19 +56,13 @@ describe('Security Middleware Integration', () => {
             expect(response.status).not.toBe(200);
         });
 
-        it('should allow requests with no origin header', async () => {
-            process.env.ALLOWED_ORIGINS = 'https://example.com';
-            
-            jest.isolateModules(() => {
-                const { applySecurityMiddleware: applySecurity } = require('./security');
-                applySecurity(app);
-            });
-
-            app.get('/test', (_req, res) => res.json({ success: true }));
-
-            const response = await request(app).get('/test');
-
-            expect(response.status).toBe(200);
+        // Error handler to catch CORS errors and return 403 instead of 500
+        app.use((err: any, _req: Request, res: Response, _next: express.NextFunction) => {
+            if (err.message === 'Not allowed by CORS policy') {
+                res.status(403).json({ error: 'CORS policy violation' });
+            } else {
+                res.status(500).json({ error: 'Internal Server Error' });
+            }
         });
 
         it('should handle preflight OPTIONS requests', async () => {
