@@ -243,7 +243,7 @@ export class QueueManager {
     });
 
     queueEvents.on('error', (error: Error) => {
-      console.error(`[${jobType}] Queue events error:`, error.message);
+      console.error(`[${jobType}] QueueEvents error:`, error.message);
     });
   }
 

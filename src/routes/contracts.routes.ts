@@ -5,14 +5,14 @@ import { createContractSchema } from '../modules/contracts/dto/contract.dto';
 
 const router = Router();
 
-// Configure routes for the Contracts module
+router.get('/bounds', ContractsController.getBounds);
+
 router.get('/', ContractsController.getContracts);
 
-// Enforce Zod input validation on the POST route
 router.post(
-  '/', 
-  validateSchema(createContractSchema), 
-  ContractsController.createContract
+  '/',
+  validateSchema(createContractSchema),
+  ContractsController.createContract,
 );
 
 export default router;

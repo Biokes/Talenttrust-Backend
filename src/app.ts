@@ -16,6 +16,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { healthRouter } from './routes/health';
 import contractsModuleRouter from './routes/contracts.routes';
 import reputationRouter from './routes/reputation.routes';
+import dependencyScanRouter from './routes/dependency-scan.routes';
 import { requestIdMiddleware } from './middleware/requestId';
 
 interface AppFactoryOptions {
@@ -53,6 +54,7 @@ export function createApp(options: AppFactoryOptions = {}): express.Application 
   app.use('/health', healthRouter);
   app.use('/api/v1/contracts', contractsModuleRouter);
   app.use('/api/v1/reputation', reputationRouter);
+  app.use('/api/v1/dependency-scan', dependencyScanRouter);
 
   if (includeTerminalHandlers) {
     attachTerminalHandlers(app);

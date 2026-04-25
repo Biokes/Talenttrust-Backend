@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ContractsService } from '../services/contracts.service';
 import { CreateContractDto } from '../modules/contracts/dto/contract.dto';
+import { CONTRACT_BOUNDS, ContractBoundsError } from '../contracts/bounds';
 
 const contractsService = new ContractsService();
 
@@ -10,12 +11,12 @@ const contractsService = new ContractsService();
  * Delegates core logic to the ContractsService.
  */
 export class ContractsController {
-  
+
   /**
    * GET /api/v1/contracts
    * Fetch a list of all escrow contracts.
    */
-  public static async getContracts(req: Request, res: Response, next: NextFunction) {
+  public static async getContracts(_req: Request, res: Response, next: NextFunction) {
     try {
       const contracts = await contractsService.getAllContracts();
       res.status(200).json({ status: 'success', data: contracts });
@@ -34,7 +35,19 @@ export class ContractsController {
       const newContract = await contractsService.createContract(data);
       res.status(201).json({ status: 'success', data: newContract });
     } catch (error) {
+      if (error instanceof ContractBoundsError) {
+        res.status(422).json({ status: 'error', message: error.message });
+        return;
+      }
       next(error);
     }
+  }
+
+  /**
+   * GET /api/v1/contracts/bounds
+   * Returns the enforced per-contract limits for client discovery.
+   */
+  public static getBounds(_req: Request, res: Response) {
+    res.status(200).json({ status: 'success', data: CONTRACT_BOUNDS });
   }
 }
