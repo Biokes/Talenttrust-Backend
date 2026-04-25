@@ -7,9 +7,37 @@
 
 import { Queue, Worker, Job, QueueEvents } from 'bullmq';
 import { queueConfig } from './config';
-import { JobType, JobPayload, JobResult } from './types';
+import {
+  JobType,
+  JobPayload,
+  JobResult,
+  JobEnqueueOptions,
+  FailedJobEntry,
+  FailedJobQuery,
+  ReplayJobResult,
+} from './types';
 import { jobProcessors } from './processors';
 
+/**
+ * Queue health information - safe for admin exposure
+ */
+export interface QueueHealthInfo {
+  jobType: JobType;
+  isInitialized: boolean;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+  paused: boolean;
+}
+
+export interface FailedJobInfo {
+  jobId: string;
+  jobType: JobType;
+  failedAt: number;
+  error: string;
+}
 /**
  * QueueManager handles queue lifecycle and job processing
  * Implements singleton pattern to ensure single Redis connection pool
@@ -50,6 +78,10 @@ export class QueueManager {
       defaultJobOptions: queueConfig.defaultJobOptions,
     });
 
+    queue.on('error', (error: Error) => {
+      console.error(`[${jobType}] Queue error:`, error.message);
+    });
+
     const worker = new Worker(
       jobType,
       async (job: Job) => {
@@ -84,7 +116,7 @@ export class QueueManager {
   public async addJob(
     jobType: JobType,
     payload: JobPayload,
-    options?: { priority?: number; delay?: number }
+    options?: JobEnqueueOptions
   ): Promise<string> {
     const queue = this.queues.get(jobType);
     if (!queue) {
@@ -93,6 +125,92 @@ export class QueueManager {
 
     const job = await queue.add(jobType, payload, options);
     return job.id!;
+  }
+
+  private buildReplayJobId(jobType: JobType, originalJobId: string): string {
+    return `replay:${jobType}:${originalJobId}`;
+  }
+
+  private toFailedJobEntry(jobType: JobType, job: Job): FailedJobEntry {
+    return {
+      jobId: String(job.id),
+      jobType,
+      name: job.name,
+      data: job.data as JobPayload,
+      failedReason: job.failedReason ?? null,
+      attemptsMade: job.attemptsMade,
+      finishedOn: job.finishedOn ?? null,
+      timestamp: job.timestamp,
+      replayDeduplicationKey: this.buildReplayJobId(jobType, String(job.id)),
+    };
+  }
+
+  public async getFailedJobs(query: FailedJobQuery = {}): Promise<FailedJobEntry[]> {
+    const normalizedLimit = Math.min(Math.max(query.limit ?? 50, 1), 100);
+    const normalizedOffset = Math.max(query.offset ?? 0, 0);
+    const fetchEnd = normalizedOffset + normalizedLimit - 1;
+
+    if (query.jobType) {
+      const queue = this.queues.get(query.jobType);
+      if (!queue) {
+        throw new Error(`Queue for ${query.jobType} not initialized`);
+      }
+
+      const failed = await queue.getJobs(['failed'], normalizedOffset, fetchEnd, false);
+      return failed.map((job) => this.toFailedJobEntry(query.jobType as JobType, job));
+    }
+
+    const allFailedJobs = await Promise.all(
+      Array.from(this.queues.entries()).map(async ([jobType, queue]) => {
+        const failed = await queue.getJobs(['failed'], 0, fetchEnd, false);
+        return failed.map((job) => this.toFailedJobEntry(jobType, job));
+      })
+    );
+
+    return allFailedJobs
+      .flat()
+      .sort((a, b) => (b.finishedOn ?? 0) - (a.finishedOn ?? 0))
+      .slice(normalizedOffset, normalizedOffset + normalizedLimit);
+  }
+
+  public async reprocessFailedJob(
+    jobType: JobType,
+    originalJobId: string
+  ): Promise<ReplayJobResult> {
+    const queue = this.queues.get(jobType);
+    if (!queue) {
+      throw new Error(`Queue for ${jobType} not initialized`);
+    }
+
+    const failedJob = await queue.getJob(originalJobId);
+    if (!failedJob) {
+      throw new Error(`Failed job not found: ${originalJobId}`);
+    }
+
+    const currentState = await failedJob.getState();
+    if (currentState !== 'failed') {
+      throw new Error(`Job ${originalJobId} is not in failed state`);
+    }
+
+    const replayJobId = this.buildReplayJobId(jobType, originalJobId);
+    const existingReplayJob = await queue.getJob(replayJobId);
+    if (existingReplayJob) {
+      return {
+        replayJobId,
+        deduplicated: true,
+        originalJobId,
+        jobType,
+      };
+    }
+
+    await queue.add(jobType, failedJob.data as JobPayload, { jobId: replayJobId });
+
+    return {
+      replayJobId,
+      deduplicated: false,
+      originalJobId,
+      jobType,
+    };
   }
 
   /**
@@ -132,12 +250,20 @@ export class QueueManager {
       console.error(`[${jobType}] Job ${job?.id} failed:`, error.message);
     });
 
+    worker.on('error', (error: Error) => {
+      console.error(`[${jobType}] Worker error:`, error.message);
+    });
+
     queueEvents.on('waiting', ({ jobId }: { jobId: string | undefined }) => {
       console.log(`[${jobType}] Job ${jobId} is waiting`);
     });
 
     queueEvents.on('active', ({ jobId }: { jobId: string | undefined }) => {
       console.log(`[${jobType}] Job ${jobId} is active`);
+    });
+
+    queueEvents.on('error', (error: Error) => {
+      console.error(`[${jobType}] QueueEvents error:`, error.message);
     });
   }
 
@@ -209,5 +335,81 @@ export class QueueManager {
     this.isShuttingDown = false;
 
     console.log('Queue manager shutdown complete');
+  }
+
+  /**
+   * Get health information for all queues
+   * Returns sanitized queue metrics without sensitive job data
+   *
+   * @returns Array of queue health information
+   */
+  public async getHealth(): Promise<QueueHealthInfo[]> {
+    const healthInfos: QueueHealthInfo[] = [];
+
+    for (const jobType of Object.values(JobType)) {
+      const queue = this.queues.get(jobType);
+      const worker = this.workers.get(jobType);
+
+      if (queue && worker) {
+        const [waiting, active, completed, failed, delayed] = await Promise.all([
+          queue.getWaitingCount(),
+          queue.getActiveCount(),
+          queue.getCompletedCount(),
+          queue.getFailedCount(),
+          queue.getDelayedCount(),
+        ]);
+
+        healthInfos.push({
+          jobType,
+          isInitialized: true,
+          waiting,
+          active,
+          completed,
+          failed,
+          delayed,
+          paused: await worker.isRunning() === false,
+        });
+      } else {
+        healthInfos.push({
+          jobType,
+          isInitialized: false,
+          waiting: 0,
+          active: 0,
+          completed: 0,
+          failed: 0,
+          delayed: 0,
+          paused: false,
+        });
+      }
+    }
+
+    return healthInfos;
+  }
+
+  /**
+   * Get recent failed jobs
+   * Returns sanitized information about recently failed jobs without exposing payloads
+   *
+   * @param limit - Maximum number of failed jobs to return (default 10)
+   * @returns Array of failed job information
+   */
+  public async getRecentFailures(limit = 10): Promise<FailedJobInfo[]> {
+    const failures: FailedJobInfo[] = [];
+
+    for (const [jobType, queue] of this.queues) {
+      const failedJobs = await queue.getFailed(0, limit);
+      for (const job of failedJobs) {
+        failures.push({
+          jobId: job.id?.toString() ?? 'unknown',
+          jobType,
+          failedAt: job.finishedOn ?? Date.now(),
+          error: job.failedReason ?? 'Unknown error',
+        });
+      }
+    }
+
+    return failures
+      .sort((a, b) => b.failedAt - a.failedAt)
+      .slice(0, limit);
   }
 }

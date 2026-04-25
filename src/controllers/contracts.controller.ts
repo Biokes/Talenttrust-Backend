@@ -3,6 +3,7 @@ import { ContractsService } from '../services/contracts.service';
 import { ContractRepository } from '../repositories/contractRepository';
 import { getDb } from '../db/database';
 import { CreateContractDto } from '../modules/contracts/dto/contract.dto';
+import { CONTRACT_BOUNDS, ContractBoundsError } from '../contracts/bounds';
 
 const contractsService = new ContractsService(new ContractRepository(getDb()));
 
@@ -12,15 +13,43 @@ const contractsService = new ContractsService(new ContractRepository(getDb()));
  * Delegates core logic to the ContractsService.
  */
 export class ContractsController {
-  
+
   /**
    * GET /api/v1/contracts
-   * Fetch a list of all escrow contracts (includes version field).
+   * Fetch a paginated list of escrow contracts.
+   *
+   * Query params:
+   *   page  - positive integer, defaults to 1
+   *   limit - positive integer 1..100, defaults to 20
+   *
+   * Returns 400 if page or limit are invalid (non-integer, negative, or out of range).
    */
-  public static async getContracts(req: Request, res: Response, next: NextFunction) {
+  public static async getContracts(_req: Request, res: Response, next: NextFunction) {
     try {
-      const contracts = await contractsService.getAllContracts();
-      res.status(200).json({ status: 'success', data: contracts });
+      const pagination = parsePaginationQuery((req.query ?? {}) as Record<string, unknown>);
+      if (!pagination.ok) {
+        res.status(400).json({
+          status: 'error',
+          message: pagination.error,
+        });
+        return;
+      }
+
+      const allContracts = await contractsService.getAllContracts();
+      const { page, limit, offset } = pagination.value;
+      const pageItems = applyPagination(allContracts, { page, limit, offset });
+      const total = allContracts.length;
+
+      res.status(200).json({
+        status: 'success',
+        data: pageItems,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
     } catch (error) {
       next(error);
     }
@@ -53,23 +82,19 @@ export class ContractsController {
       const newContract = await contractsService.createContract(data);
       res.status(201).json({ status: 'success', data: newContract });
     } catch (error) {
+      if (error instanceof ContractBoundsError) {
+        res.status(422).json({ status: 'error', message: error.message });
+        return;
+      }
       next(error);
     }
   }
 
   /**
-   * PATCH /api/v1/contracts/:id
-   * Update an existing contract using Optimistic Concurrency Control.
-   * Requires `version` in the request body to detect conflicts.
-   * On version mismatch the service throws VersionConflictError which the
-   * global errorHandler maps to 409 ERR_CONFLICT automatically.
+   * GET /api/v1/contracts/bounds
+   * Returns the enforced per-contract limits for client discovery.
    */
-  public static async updateContract(req: Request, res: Response, next: NextFunction) {
-    try {
-      const contract = await contractsService.updateContract(req.params.id, req.body);
-      res.status(200).json({ status: 'success', data: contract });
-    } catch (error) {
-      next(error);
-    }
+  public static getBounds(_req: Request, res: Response) {
+    res.status(200).json({ status: 'success', data: CONTRACT_BOUNDS });
   }
 }

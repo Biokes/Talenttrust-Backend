@@ -48,11 +48,12 @@ export async function stellarRpcProbe(): Promise<ProbeResult> {
     };
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  timeout.unref();
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(url, { method: "GET", signal: controller.signal });
-    clearTimeout(timeout);
 
     const latencyMs = Date.now() - start;
     const ok = res.status < 500;
@@ -69,5 +70,7 @@ export async function stellarRpcProbe(): Promise<ProbeResult> {
       detail: err instanceof Error ? err.message : "unknown error",
       latencyMs: Date.now() - start,
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }

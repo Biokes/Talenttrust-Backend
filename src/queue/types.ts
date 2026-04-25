@@ -62,6 +62,42 @@ export type JobPayload =
   | ReputationUpdatePayload
   | BlockchainSyncPayload;
 
+export interface JobEnqueueOptions {
+  priority?: number;
+  delay?: number;
+  jobId?: string;
+  attempts?: number;
+  backoff?: {
+    type: 'fixed' | 'exponential';
+    delay: number;
+  };
+}
+
+export interface FailedJobEntry {
+  jobId: string;
+  jobType: JobType;
+  name: string;
+  data: JobPayload;
+  failedReason: string | null;
+  attemptsMade: number;
+  finishedOn: number | null;
+  timestamp: number;
+  replayDeduplicationKey: string;
+}
+
+export interface FailedJobQuery {
+  jobType?: JobType;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ReplayJobResult {
+  replayJobId: string;
+  deduplicated: boolean;
+  originalJobId: string;
+  jobType: JobType;
+}
+
 /**
  * Job result structure
  */
